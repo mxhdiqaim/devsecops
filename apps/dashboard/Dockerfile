@@ -4,7 +4,7 @@ WORKDIR /app
 
 FROM base AS install
 
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 COPY packages/db/package.json ./packages/db/
 COPY apps/dashboard/package.json ./apps/dashboard/
 
