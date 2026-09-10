@@ -12,7 +12,8 @@
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "db:push": "turbo run db:push"
+    "db:push": "turbo run db:push",
+    "scan:test": "bun run scripts/simulate-scan.ts"
   },
   "devDependencies": {
     "turbo": "^2.0.0",
