@@ -1,0 +1,14 @@
+node_modules
+.turbo
+.git
+.gitignore
+Dockerfile
+.dockerignore
+.env
+.env.*
+*.log
+README.md
+next-env.d.ts
+.trae
+sast.json
+dast.json
