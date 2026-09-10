@@ -4,15 +4,16 @@ WORKDIR /app
 
 FROM base AS install
 
-COPY package.json bun.lock* ./
+COPY package.json bun.lock* turbo.json ./
 COPY packages/db/package.json ./packages/db/
 COPY apps/dashboard/package.json ./apps/dashboard/
+COPY apps/target-api/package.json ./apps/target-api/
 
 RUN bun install
 
 FROM base AS build
 
-COPY --from=install /app/node_modules ./node_modules
+COPY --from=install /app ./
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -29,12 +30,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-COPY --from=install /app/node_modules ./node_modules
-COPY --from=build /app/packages/db ./packages/db
-COPY --from=build /app/apps/dashboard ./apps/dashboard
-COPY --from=build /app/apps/dashboard/.next ./apps/dashboard/.next
-COPY package.json bun.lock* ./
-COPY turbo.json ./
+COPY --from=build /app ./
 
 EXPOSE 3000
 
