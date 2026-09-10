@@ -5,6 +5,10 @@ bun.lockb
 .pnp
 .pnp.js
 
+.cursor
+.trae
+.turbo
+
 # Build output
 dist
 .next

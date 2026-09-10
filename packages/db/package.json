@@ -6,11 +6,9 @@
   "types": "./index.ts",
   "scripts": {
     "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push:pg",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "lint": "echo \"lint db\"",
-    "build": "echo \"build db\""
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "drizzle-orm": "^0.29.3",
