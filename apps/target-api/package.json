@@ -1,0 +1,20 @@
+{
+  "name": "target-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist",
+    "lint": "echo \"lint target-api\""
+  },
+  "dependencies": {
+    "elysia": "^0.8.17",
+    "@repo/db": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "bun-types": "^1.0.25"
+  }
+}
