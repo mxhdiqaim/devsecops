@@ -2,7 +2,7 @@ FROM oven/bun:latest AS base
 
 WORKDIR /app
 
-FROM base AS install
+FROM base AS build
 
 COPY package.json bun.lock* turbo.json ./
 COPY packages/db/package.json ./packages/db/
@@ -11,13 +11,11 @@ COPY apps/target-api/package.json ./apps/target-api/
 
 RUN bun install
 
-FROM base AS build
-
-COPY --from=install /app ./
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=2048
 
 RUN bun run build --filter dashboard...
 

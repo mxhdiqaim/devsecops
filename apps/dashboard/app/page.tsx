@@ -1,5 +1,4 @@
-import { desc, eq, count } from "drizzle-orm";
-import { db, scans, vulnerabilities } from "@repo/db";
+import { db, scans, vulnerabilities, desc, eq, count } from "@repo/db";
 
 function severityClass(sev: string): string {
   switch (sev) {

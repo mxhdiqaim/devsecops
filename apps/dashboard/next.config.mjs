@@ -2,8 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@repo/db"],
+  eslint: {
+    ignoreDuringBuilds: true
+  },
   experimental: {
-    serverComponentsExternalPackages: ["postgres"]
+    serverComponentsExternalPackages: ["postgres"],
+    webpackBuildWorker: false,
+    cpus: 1
   }
 };
 

@@ -21,4 +21,5 @@ export async function rawUnsafe(sql: string): Promise<any[]> {
   }
 }
 
+export { desc, eq, count } from "drizzle-orm";
 export * from "./schema";
