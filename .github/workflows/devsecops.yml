@@ -13,165 +13,165 @@ jobs:
       contents: read
     services:
       # optional; most steps use docker compose directly on the runner instead
-    steps:
-      - name: "Stage 1a. Checkout repository"
-        uses: actions/checkout@v4
+      steps:
+        - name: "Stage 1a. Checkout repository"
+          uses: actions/checkout@v4
 
-      - name: "Stage 1b. Setup Bun"
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
+        - name: "Stage 1b. Setup Bun"
+          uses: oven-sh/setup-bun@v1
+          with:
+            bun-version: latest
 
-      - name: "Stage 1c. Install workspace dependencies"
-        run: bun install --frozen-lockfile || bun install
+        - name: "Stage 1c. Install workspace dependencies"
+          run: bun install --frozen-lockfile || bun install
 
-      - name: "Stage 2. Linting (bunx eslint)"
-        run: bunx eslint . --max-warnings 9999
-        continue-on-error: true
+        - name: "Stage 2. Linting (bunx eslint)"
+          run: bunx eslint . --max-warnings 9999
+          continue-on-error: true
 
-      - name: "Stage 3. SAST (Semgrep)"
-        run: |
-          python3 -m pip install --no-cache-dir semgrep
-          semgrep scan --config auto --json -o sast.json apps/target-api
-        continue-on-error: true
+        - name: "Stage 3. SAST (Semgrep)"
+          run: |
+            python3 -m pip install --no-cache-dir semgrep
+            semgrep scan --config auto --json -o sast.json apps/target-api
+          continue-on-error: true
 
-      - name: "Stage 4. Environment spin-up (docker compose + sleep 15)"
-        run: |
-          docker compose up -d --build
-          sleep 15
-          docker compose ps
+        - name: "Stage 4. Environment spin-up (docker compose + sleep 15)"
+          run: |
+            docker compose up -d --build
+            sleep 15
+            docker compose ps
 
-      - name: "Stage 5. DAST (OWASP ZAP) against target-api"
-        run: |
-          NETWORK=$(docker network ls --format '{{.Name}}' | grep -E 'devsecops|code-analysis|default' | head -n1 || echo bridge)
-          echo "Using docker network: $NETWORK"
-          docker run --rm \
-            --network "$NETWORK" \
-            -v "$(pwd):/zap/wrk/:rw" \
-            -t ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://target-api:4000 -J dast.json -r dast-report.html || true
-          ls -la dast.json sast.json || true
-        continue-on-error: true
+        - name: "Stage 5. DAST (OWASP ZAP) against target-api"
+          run: |
+            NETWORK=$(docker network ls --format '{{.Name}}' | grep -E 'devsecops|code-analysis|default' | head -n1 || echo bridge)
+            echo "Using docker network: $NETWORK"
+            docker run --rm \
+              --network "$NETWORK" \
+              -v "$(pwd):/zap/wrk/:rw" \
+              -t ghcr.io/zaproxy/zaproxy:stable \
+              zap-baseline.py -t http://target-api:4000 -J dast.json -r dast-report.html || true
+            ls -la dast.json sast.json || true
+          continue-on-error: true
 
-      - name: "Stage 6. Webhook / Aggregate — POST findings to Dashboard"
-        env:
-          DASHBOARD_URL: "http://localhost:3000/api/webhooks/scans"
-        run: |
-          cat > /tmp/aggregate.ts <<'SCRIPT'
-          const fs = require("fs");
-          const path = require("path");
+        - name: "Stage 6. Webhook / Aggregate — POST findings to Dashboard"
+          env:
+            DASHBOARD_URL: "http://localhost:3000/api/webhooks/scans"
+          run: |
+            cat > /tmp/aggregate.ts <<'SCRIPT'
+            const fs = require("fs");
+            const path = require("path");
 
-          const dashboardUrl = process.env.DASHBOARD_URL || "http://localhost:3000/api/webhooks/scans";
+            const dashboardUrl = process.env.DASHBOARD_URL || "http://localhost:3000/api/webhooks/scans";
 
-          function readJSON(file: string): any {
-            try {
-              const p = path.resolve(process.cwd(), file);
-              if (!fs.existsSync(p)) return null;
-              const raw = fs.readFileSync(p, "utf-8");
-              return JSON.parse(raw || "null");
-            } catch (e) {
-              console.warn(`Failed to read ${file}:`, e);
-              return null;
-            }
-          }
-
-          function sevFromSemgrep(sev: string): string {
-            switch ((sev || "").toUpperCase()) {
-              case "ERROR": return "CRITICAL";
-              case "WARNING": return "HIGH";
-              case "INFO": return "LOW";
-              default: return "MEDIUM";
-            }
-          }
-
-          function sevFromZap(risk: string | number, confidence?: string | number): string {
-            const r = String(risk || "").toUpperCase();
-            const map: Record<string, string> = {
-              "3": "HIGH", "HIGH": "HIGH",
-              "2": "MEDIUM", "MEDIUM": "MEDIUM",
-              "1": "LOW", "LOW": "LOW",
-              "0": "INFO", "INFO": "INFO"
-            };
-            return map[r] || "INFO";
-          }
-
-          function collectSemgrep(data: any): any[] {
-            if (!data) return [];
-            const results: any[] = [];
-            const arr = data.results || data.findings || [];
-            for (const r of arr) {
-              results.push({
-                severity: sevFromSemgrep(r.severity || r.extra?.severity || "WARNING"),
-                tool: "semgrep",
-                description: `${r.check_id || r.rule_id || "rule"} — ${r.extra?.message || r.message || ""} @ ${r.path || ""}:${r.start?.line ?? ""}`
-              });
-            }
-            return results;
-          }
-
-          function collectZap(data: any): any[] {
-            if (!data) return [];
-            const out: any[] = [];
-            const alerts =
-              data.alerts ||
-              data.site?.[0]?.alerts ||
-              data["@generated"] && data.alerts ||
-              [];
-            for (const a of alerts) {
-              out.push({
-                severity: sevFromZap(a.riskcode ?? a.risk, a.confidence),
-                tool: "zap",
-                description: `${a.alert || a.name} [${a.pluginid || a.id}] — ${a.desc || a.description || ""}`
-              });
-            }
-            return out;
-          }
-
-          async function main() {
-            const sast = readJSON("sast.json");
-            const dast = readJSON("dast.json");
-            const combined = [
-              ...collectSemgrep(sast),
-              ...collectZap(dast)
-            ];
-            console.log(`POSTing ${combined.length} findings to ${dashboardUrl}`);
-            const payload = { vulnerabilities: combined };
-
-            let resp;
-            try {
-              resp = await fetch(dashboardUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-              });
-            } catch (e: any) {
-              console.error("Webhook fetch failed:", e?.message || e);
-              process.exit(1);
+            function readJSON(file: string): any {
+              try {
+                const p = path.resolve(process.cwd(), file);
+                if (!fs.existsSync(p)) return null;
+                const raw = fs.readFileSync(p, "utf-8");
+                return JSON.parse(raw || "null");
+              } catch (e) {
+                console.warn(`Failed to read ${file}:`, e);
+                return null;
+              }
             }
 
-            const text = await resp.text();
-            console.log(`Response status: ${resp.status}`);
-            console.log(`Response body: ${text}`);
-
-            if (resp.status === 403) {
-              console.log("PIPELINE BLOCKED due to CRITICAL/HIGH findings.");
-              process.exit(0);
+            function sevFromSemgrep(sev: string): string {
+              switch ((sev || "").toUpperCase()) {
+                case "ERROR": return "CRITICAL";
+                case "WARNING": return "HIGH";
+                case "INFO": return "LOW";
+                default: return "MEDIUM";
+              }
             }
-            if (resp.status >= 500) {
-              process.exit(1);
+
+            function sevFromZap(risk: string | number, confidence?: string | number): string {
+              const r = String(risk || "").toUpperCase();
+              const map: Record<string, string> = {
+                "3": "HIGH", "HIGH": "HIGH",
+                "2": "MEDIUM", "MEDIUM": "MEDIUM",
+                "1": "LOW", "LOW": "LOW",
+                "0": "INFO", "INFO": "INFO"
+              };
+              return map[r] || "INFO";
             }
-          }
 
-          main();
-          SCRIPT
-          bun /tmp/aggregate.ts
+            function collectSemgrep(data: any): any[] {
+              if (!data) return [];
+              const results: any[] = [];
+              const arr = data.results || data.findings || [];
+              for (const r of arr) {
+                results.push({
+                  severity: sevFromSemgrep(r.severity || r.extra?.severity || "WARNING"),
+                  tool: "semgrep",
+                  description: `${r.check_id || r.rule_id || "rule"} — ${r.extra?.message || r.message || ""} @ ${r.path || ""}:${r.start?.line ?? ""}`
+                });
+              }
+              return results;
+            }
 
-      - name: Upload SAST & DAST artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: devsecops-reports
-          path: |
-            sast.json
-            dast.json
-            dast-report.html
-          if-no-files-found: ignore
+            function collectZap(data: any): any[] {
+              if (!data) return [];
+              const out: any[] = [];
+              const alerts =
+                data.alerts ||
+                data.site?.[0]?.alerts ||
+                data["@generated"] && data.alerts ||
+                [];
+              for (const a of alerts) {
+                out.push({
+                  severity: sevFromZap(a.riskcode ?? a.risk, a.confidence),
+                  tool: "zap",
+                  description: `${a.alert || a.name} [${a.pluginid || a.id}] — ${a.desc || a.description || ""}`
+                });
+              }
+              return out;
+            }
+
+            async function main() {
+              const sast = readJSON("sast.json");
+              const dast = readJSON("dast.json");
+              const combined = [
+                ...collectSemgrep(sast),
+                ...collectZap(dast)
+              ];
+              console.log(`POSTing ${combined.length} findings to ${dashboardUrl}`);
+              const payload = { vulnerabilities: combined };
+
+              let resp;
+              try {
+                resp = await fetch(dashboardUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload)
+                });
+              } catch (e: any) {
+                console.error("Webhook fetch failed:", e?.message || e);
+                process.exit(1);
+              }
+
+              const text = await resp.text();
+              console.log(`Response status: ${resp.status}`);
+              console.log(`Response body: ${text}`);
+
+              if (resp.status === 403) {
+                console.log("PIPELINE BLOCKED due to CRITICAL/HIGH findings.");
+                process.exit(0);
+              }
+              if (resp.status >= 500) {
+                process.exit(1);
+              }
+            }
+
+            main();
+            SCRIPT
+            bun /tmp/aggregate.ts
+
+        - name: Upload SAST & DAST artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: devsecops-reports
+            path: |
+              sast.json
+              dast.json
+              dast-report.html
+            if-no-files-found: ignore
