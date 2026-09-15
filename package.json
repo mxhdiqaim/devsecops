@@ -13,6 +13,7 @@
     "db:migrate": "turbo run db:migrate",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:push": "turbo run db:push",
+    "db:seed": "bun run packages/db/seed.ts",
     "scan:test": "bun run scripts/simulate-scan.ts"
   },
   "devDependencies": {
