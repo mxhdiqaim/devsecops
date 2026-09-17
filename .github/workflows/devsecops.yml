@@ -38,6 +38,8 @@ jobs:
           docker compose up -d --build
           sleep 15
           docker compose ps
+          # Push the schema to the ephemeral pipeline database
+          DATABASE_URL="postgres://devsecops:devsecops@localhost:5432/devsecops" bun run db:push
 
       - name: "Stage 5. DAST (OWASP ZAP) against target-api"
         run: |
