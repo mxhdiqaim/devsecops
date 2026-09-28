@@ -1,4 +1,4 @@
-const WEBHOOK_URL = "http://localhost:3000/api/webhooks/scans";
+const WEBHOOK_URL = "http://localhost:3000/api/webhooks/scans" as const;
 
 const payload = {
   vulnerabilities: [
