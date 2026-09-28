@@ -1,43 +1,12 @@
 import { NextResponse } from "next/server";
 import { db, scans, vulnerabilities } from "@repo/db";
+import { collectVulns, normalizeSeverity } from "@/app/utils";
+import { BodyPayload } from "@/app/types";
 
-type VulnInput = {
-  severity: string;
-  tool: string;
-  description: string;
-  [k: string]: any;
-};
-
-type Payload = {
-  vulnerabilities?: VulnInput[];
-  findings?: VulnInput[];
-  results?: VulnInput[];
-};
-
-function normalizeSeverity(raw: string): string {
-  const s = (raw || "").toUpperCase().trim();
-  if (s === "CRITICAL" || s === "ERROR" || s === "FATAL" || s === "BLOCKER")
-    return "CRITICAL";
-  if (s === "HIGH" || s === "MAJOR") return "HIGH";
-  if (s === "MEDIUM" || s === "MODERATE") return "MEDIUM";
-  if (s === "LOW" || s === "MINOR") return "LOW";
-  if (s === "INFO" || s === "INFORMATIONAL" || s === "NOTE" || s === "TRACE")
-    return "INFO";
-  return s || "INFO";
-}
-
-function collectVulns(body: Payload): VulnInput[] {
-  if (Array.isArray(body)) return body;
-  return [
-    ...(Array.isArray(body.vulnerabilities) ? body.vulnerabilities : []),
-    ...(Array.isArray(body.findings) ? body.findings : []),
-    ...(Array.isArray(body.results) ? body.results : [])
-  ];
-}
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as Payload;
+    const body = (await req.json()) as BodyPayload;
     const rawVulns = collectVulns(body);
 
     const normalized = rawVulns.map((v) => ({
@@ -100,7 +69,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     return NextResponse.json(
       {
-        error: "Invalid payload or DB error",
+        error: "Invalid Body or DB error",
         details: err?.message || String(err)
       },
       { status: 400 }
