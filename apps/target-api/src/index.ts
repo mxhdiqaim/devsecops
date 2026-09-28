@@ -11,7 +11,7 @@ const app = new Elysia();
 app.get("/", () => ({
   status: "ok",
   app: "target-api",
-  key: AWS_ACCESS_KEY_ID
+  key: AWS_ACCESS_KEY_ID || AWS_SECRET_ACCESS_KEY,
 }));
 
 app.get("/users", async ({ query, set }) => {

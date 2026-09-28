@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "target": "ES2022",
     "types": ["bun-types"],
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@repo/db": ["../../packages/db"]
