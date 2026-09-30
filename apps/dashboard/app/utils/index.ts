@@ -48,7 +48,7 @@ export const normalizeSeverity = (rawSeverity: string): string => {
     return severity || "INFO";
 }
 
-export const collectVulns = (body: BodyPayload): VulnerabilityInput[] => {
+export const collectVulnerabilities = (body: BodyPayload): VulnerabilityInput[] => {
     if (Array.isArray(body)) return body;
 
     return [

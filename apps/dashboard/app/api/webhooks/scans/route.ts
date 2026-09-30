@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 import { db, scans, vulnerabilities } from "@repo/db";
-import { collectVulns, normalizeSeverity } from "@/app/utils";
+import { collectVulnerabilities, normalizeSeverity } from "@/app/utils";
 import { BodyPayload } from "@/app/types";
 
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as BodyPayload;
-    const rawVulns = collectVulns(body);
+    const rawVulnerabilities = collectVulnerabilities(body);
 
-    const normalized = rawVulns.map((v) => ({
-      severity: normalizeSeverity(v.severity),
-      tool: String(v.tool || "unknown"),
-      description: String(v.description || JSON.stringify(v))
+    const normalized = rawVulnerabilities.map((vulnerability) => ({
+      severity: normalizeSeverity(vulnerability.severity),
+      tool: String(vulnerability.tool || "unknown"),
+      description: String(vulnerability.description || JSON.stringify(vulnerability))
     }));
 
-    const criticalCount = normalized.filter((v) => v.severity === "CRITICAL")
+    const criticalCount = normalized.filter((vulnerability) => vulnerability.severity === "CRITICAL")
       .length;
-    const highCount = normalized.filter((v) => v.severity === "HIGH").length;
+    const highCount = normalized.filter((vulnerability) => vulnerability.severity === "HIGH").length;
     const hasBlocker = criticalCount > 0 || highCount > 0;
     const scanStatus = hasBlocker ? "BLOCKED" : "PASSED";
 
@@ -33,11 +33,11 @@ export async function POST(req: Request) {
 
     if (normalized.length > 0) {
       await db.insert(vulnerabilities).values(
-        normalized.map((v) => ({
+        normalized.map((vulnerability) => ({
           scanId: scan.id,
-          severity: v.severity,
-          tool: v.tool,
-          description: v.description
+          severity: vulnerability.severity,
+          tool: vulnerability.tool,
+          description: vulnerability.description
         }))
       );
     }
